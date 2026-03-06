@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # ────────────────────────────────────────────
+  # Infrastructure
+  # ────────────────────────────────────────────
+  postgres_db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trading_user
+      POSTGRES_PASSWORD: trading_password
+      POSTGRES_DB: xauusd_trading
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U trading_user -d xauusd_trading" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis_cache:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ────────────────────────────────────────────
+  # Microservices
+  # ────────────────────────────────────────────
+  api_gateway:
+    build: ./services/api_gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://trading_user:trading_password@postgres_db:5432/xauusd_trading
+      - REDIS_URL=redis://redis_cache:6379/0
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+      redis_cache:
+        condition: service_healthy
+
+  market_data:
+    build: ./services/market_data
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql://trading_user:trading_password@postgres_db:5432/xauusd_trading
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  data_pipeline:
+    build: ./services/data_pipeline
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - DATABASE_URL=postgresql://trading_user:trading_password@postgres_db:5432/xauusd_trading
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  ai_model:
+    build: ./services/ai_model
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  strategy_engine:
+    build: ./services/strategy_engine
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    env_file: .env
+
+  risk_manager:
+    build: ./services/risk_manager
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    env_file: .env
+
+  execution:
+    build: ./services/execution
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+  backtesting:
+    build: ./services/backtesting
+    restart: unless-stopped
+    ports:
+      - "8007:8007"
+    env_file: .env
+    depends_on:
+      postgres_db:
+        condition: service_healthy
+
+volumes:
+  pgdata:

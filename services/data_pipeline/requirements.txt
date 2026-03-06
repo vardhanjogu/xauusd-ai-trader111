@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pandas
+numpy
+ta
+scikit-learn
+psycopg2-binary
+sqlalchemy
+pydantic
+pydantic-settings

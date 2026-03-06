@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+scikit-learn
+joblib
+pandas
+numpy
+google-cloud-storage
+psycopg2-binary
+sqlalchemy
+pydantic-settings
